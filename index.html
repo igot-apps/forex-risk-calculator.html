@@ -7,7 +7,10 @@
 <title>Forex Risk Calculator</title>
 
 <style>
-*{box-sizing:border-box;}
+*{
+  box-sizing:border-box;
+  -webkit-tap-highlight-color: transparent;
+}
 
 body{
   font-family:Arial;
@@ -19,18 +22,20 @@ body{
   justify-content:center;
 }
 
-/* 📱 MOBILE 90% WIDTH FIX */
 .card{
   background:#1e293b;
   padding:20px;
   border-radius:20px;
-  width:90vw;           /* 🔥 90% of screen width */
+  width:90vw;
   max-width:420px;
   min-height:90vh;
   box-shadow:0 10px 30px rgba(0,0,0,0.5);
 }
 
-h2{text-align:center;font-size:20px;}
+h2{
+  text-align:center;
+  font-size:20px;
+}
 
 input,select{
   width:100%;
@@ -41,6 +46,13 @@ input,select{
   background:#0f172a;
   color:white;
   font-size:16px;
+}
+
+label{
+  display:block;
+  margin-top:6px;
+  font-size:14px;
+  opacity:0.9;
 }
 
 .btn{
@@ -70,9 +82,18 @@ input,select{
   background:#334155;
   color:white;
   cursor:pointer;
+  touch-action:manipulation;
 }
 
-.active{background:#22c55e !important;}
+.active{
+  background:#22c55e !important;
+}
+
+/* IMPORTANT: proper hide without layout bugs */
+.hidden{
+  display:none !important;
+  pointer-events:none;
+}
 
 .result{
   margin-top:15px;
@@ -84,8 +105,6 @@ input,select{
   font-weight:bold;
   color:#22c55e;
 }
-
-.error{color:#ef4444;}
 </style>
 </head>
 
@@ -97,21 +116,21 @@ input,select{
 
 <!-- BUY / SELL -->
 <div class="toggle">
-  <button id="buyBtn" onclick="setDirection('buy')">BUY</button>
-  <button id="sellBtn" onclick="setDirection('sell')">SELL</button>
+  <button onclick="setDirection('buy')" id="buyBtn">BUY</button>
+  <button onclick="setDirection('sell')" id="sellBtn">SELL</button>
 </div>
 
 <!-- MODE -->
 <div class="toggle">
-  <button id="modeRisk" onclick="setMode('risk')">Risk→SL</button>
-  <button id="modeSL" onclick="setMode('sl')">SL→Risk</button>
-  <button id="modeLot" onclick="setMode('lot')">Risk→LOT</button>
+  <button onclick="setMode('risk')" id="modeRisk">Risk→SL</button>
+  <button onclick="setMode('sl')" id="modeSL">SL→Risk</button>
+  <button onclick="setMode('lot')" id="modeLot">Risk→LOT</button>
 </div>
 
 <!-- ACCOUNT -->
 <div class="toggle">
-  <button id="stdBtn" onclick="setAccount('standard')">Standard</button>
-  <button id="centBtn" onclick="setAccount('cent')">Cent</button>
+  <button onclick="setAccount('standard')" id="stdBtn">Standard</button>
+  <button onclick="setAccount('cent')" id="centBtn">Cent</button>
 </div>
 
 <label>Pair</label>
@@ -122,16 +141,16 @@ input,select{
   <option>XAUUSD</option>
 </select>
 
-<label>Entry Price</label>
+<label id="entryLabel">Entry Price</label>
 <input id="entry" type="number">
 
-<label>Stop Loss</label>
+<label id="slLabel">Stop Loss</label>
 <input id="sl" type="number">
 
-<label>Lot Size</label>
+<label id="lotLabel">Lot Size</label>
 <input id="lot" type="number" step="0.01">
 
-<label>Risk ($)</label>
+<label id="riskLabel">Risk ($)</label>
 <input id="risk" type="number" step="0.01">
 
 <button class="btn calc" onclick="calc()">Calculate</button>
@@ -143,57 +162,16 @@ input,select{
 
 <script>
 
-let mode = "lot";
-let direction = "buy";
-let account = "standard";
+let mode="lot";
+let direction="buy";
+let account="standard";
 
-/* =========================
-   🔥 LOCAL STORAGE SAVE
-========================= */
-function saveState(){
-  const state = {
-    mode,
-    direction,
-    account,
-    pair: document.getElementById("pair").value,
-    entry: document.getElementById("entry").value,
-    sl: document.getElementById("sl").value,
-    lot: document.getElementById("lot").value,
-    risk: document.getElementById("risk").value
-  };
-
-  localStorage.setItem("fx_calc_state", JSON.stringify(state));
+/* SAFE CENT CONVERSION */
+function accountMultiplier(){
+  return account==="cent" ? 100 : 1;
 }
 
-/* =========================
-   🔥 LOAD STATE
-========================= */
-function loadState(){
-  const data = localStorage.getItem("fx_calc_state");
-  if(!data) return;
-
-  const s = JSON.parse(data);
-
-  mode = s.mode || "lot";
-  direction = s.direction || "buy";
-  account = s.account || "standard";
-
-  document.getElementById("pair").value = s.pair || "EURUSD";
-  document.getElementById("entry").value = s.entry || "";
-  document.getElementById("sl").value = s.sl || "";
-  document.getElementById("lot").value = s.lot || "";
-  document.getElementById("risk").value = s.risk || "";
-
-  applyUI();
-}
-
-/* =========================
-   ACCOUNT FACTOR (CENT FIX)
-========================= */
-function accountFactor(){
-  return account === "cent" ? 100 : 1;
-}
-
+/* PIP MODEL */
 function pipMultiplier(pair){
   return pair.includes("JPY") ? 100 : 10000;
 }
@@ -202,143 +180,101 @@ function pipValue(){
   return 10;
 }
 
-function riskPerLot(pair, diff){
-  let value = (pair === "XAUUSD")
-    ? diff * 100
-    : pipValue() * diff * pipMultiplier(pair);
-
-  return value / accountFactor();
+function riskPerLot(pair,diff){
+  return pipValue() * pipMultiplier(pair) * diff;
 }
 
-/* =========================
-   UI CONTROL
-========================= */
-function setMode(m){
-  mode = m;
-  applyUI();
-  saveState();
-}
+/* UI STATE */
+function setMode(m){ mode=m; updateUI(); }
+function setDirection(d){ direction=d; updateUI(); }
+function setAccount(a){ account=a; updateUI(); }
 
-function setDirection(d){
-  direction = d;
-  applyUI();
-  saveState();
-}
+/* BUTTON STATES + FIELD VISIBILITY */
+function updateUI(){
 
-function setAccount(a){
-  account = a;
-  applyUI();
-  saveState();
-}
+  // reset active
+  document.querySelectorAll(".toggle button").forEach(b=>b.classList.remove("active"));
 
-function applyUI(){
+  document.getElementById(mode==="risk"?"modeRisk":mode==="sl"?"modeSL":"modeLot").classList.add("active");
+  document.getElementById(direction==="buy"?"buyBtn":"sellBtn").classList.add("active");
+  document.getElementById(account==="cent"?"centBtn":"stdBtn").classList.add("active");
 
-  // reset buttons
-  ["modeRisk","modeSL","modeLot"].forEach(id=>{
-    document.getElementById(id).classList.remove("active");
-  });
+  // ALWAYS reset visibility first
+  sl.classList.remove("hidden");
+  lot.classList.remove("hidden");
+  risk.classList.remove("hidden");
 
-  ["buyBtn","sellBtn","stdBtn","centBtn"].forEach(id=>{
-    document.getElementById(id).classList.remove("active");
-  });
+  slLabel.classList.remove("hidden");
+  lotLabel.classList.remove("hidden");
+  riskLabel.classList.remove("hidden");
 
-  // mode highlight
-  document.getElementById("mode"+capitalize(mode)).classList.add("active");
+  // MODE RULES
+  if(mode==="risk"){
+    lot.classList.add("hidden");
+    lotLabel.classList.add("hidden");
+  }
 
-  // direction
-  document.getElementById(direction+"Btn").classList.add("active");
+  if(mode==="sl"){
+    risk.classList.add("hidden");
+    riskLabel.classList.add("hidden");
+  }
 
-  // account
-  document.getElementById(account==="standard"?"stdBtn":"centBtn").classList.add("active");
-}
+  if(mode==="lot"){
+    lot.classList.add("hidden");
+    lotLabel.classList.add("hidden");
+  }
 
-function capitalize(s){
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-/* =========================
-   RESET
-========================= */
-function resetAll(){
-  localStorage.removeItem("fx_calc_state");
-
-  document.getElementById("entry").value="";
-  document.getElementById("sl").value="";
-  document.getElementById("lot").value="";
-  document.getElementById("risk").value="";
-  document.getElementById("pair").value="EURUSD";
-
+  // OUT ALWAYS CLEAR
   out.innerHTML="";
 }
 
-/* =========================
-   CALC
-========================= */
+/* RESET */
+function resetAll(){
+  entry.value="";
+  sl.value="";
+  lot.value="";
+  risk.value="";
+  out.innerHTML="";
+}
+
+/* MAIN CALC */
 function calc(){
 
-  const pair = document.getElementById("pair").value;
-  const entry = parseFloat(document.getElementById("entry").value);
-  const sl = parseFloat(document.getElementById("sl").value);
-  const lot = parseFloat(document.getElementById("lot").value);
-  const risk = parseFloat(document.getElementById("risk").value);
+  let e=parseFloat(entry.value);
+  let s=parseFloat(sl.value);
+  let l=parseFloat(lot.value);
+  let r=parseFloat(risk.value);
 
-  if(!entry){
-    out.innerHTML = `<div class="error">Enter entry price</div>`;
+  let cent=accountMultiplier();
+
+  if(!e){
+    out.innerHTML="Enter Entry Price";
     return;
   }
 
-  /* SL → RISK */
-  if(mode === "sl"){
-    if(!lot || !sl){
-      out.innerHTML = `<div class="error">Enter SL & Lot</div>`;
-      return;
-    }
-
-    let diff = Math.abs(entry - sl);
-    let loss = riskPerLot(pair, diff) * lot;
-
-    out.innerHTML = `<div class="big">$${loss.toFixed(2)}</div>`;
+  if(mode==="sl"){
+    if(!l||!s){out.innerHTML="Enter SL & Lot";return;}
+    let diff=Math.abs(e-s);
+    let loss=riskPerLot(pair.value,diff)*l/cent;
+    out.innerHTML=`<div class="big">$${loss.toFixed(2)}</div>`;
   }
 
-  /* RISK → SL */
-  if(mode === "risk"){
-    if(!lot || !risk){
-      out.innerHTML = `<div class="error">Enter Risk & Lot</div>`;
-      return;
-    }
-
-    let diffUnit = riskPerLot(pair, 1);
-    let slMove = risk / (diffUnit * lot);
-
-    let price = direction === "buy"
-      ? entry - slMove
-      : entry + slMove;
-
-    out.innerHTML = `<div class="big">${price.toFixed(5)}</div>`;
+  if(mode==="risk"){
+    if(!l||!r){out.innerHTML="Enter Risk & Lot";return;}
+    let slMove=(r*cent)/(riskPerLot(pair.value,1)*l);
+    let price=direction==="buy"?e-slMove:e+slMove;
+    out.innerHTML=`<div class="big">${price.toFixed(5)}</div>`;
   }
 
-  /* RISK → LOT */
-  if(mode === "lot"){
-    if(!sl || !risk){
-      out.innerHTML = `<div class="error">Enter SL & Risk</div>`;
-      return;
-    }
-
-    let diff = Math.abs(entry - sl);
-    let riskOneLot = riskPerLot(pair, diff);
-
-    let lotSize = risk / riskOneLot;
-
-    out.innerHTML = `<div class="big">${lotSize.toFixed(3)}</div>`;
+  if(mode==="lot"){
+    if(!s||!r){out.innerHTML="Enter SL & Risk";return;}
+    let diff=Math.abs(e-s);
+    let lotSize=(r*cent)/riskPerLot(pair.value,diff);
+    out.innerHTML=`<div class="big">${lotSize.toFixed(3)}</div>`;
   }
-
-  saveState();
 }
 
-/* =========================
-   INIT
-========================= */
-loadState();
+updateUI();
 
 </script>
 
