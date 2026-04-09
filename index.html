@@ -32,10 +32,7 @@ body{
   box-shadow:0 10px 30px rgba(0,0,0,0.5);
 }
 
-h2{
-  text-align:center;
-  font-size:20px;
-}
+h2{text-align:center;font-size:20px;}
 
 input,select{
   width:100%;
@@ -52,7 +49,6 @@ label{
   display:block;
   margin-top:6px;
   font-size:14px;
-  opacity:0.9;
 }
 
 .btn{
@@ -82,17 +78,12 @@ label{
   background:#334155;
   color:white;
   cursor:pointer;
-  touch-action:manipulation;
 }
 
-.active{
-  background:#22c55e !important;
-}
+.active{background:#22c55e !important;}
 
-/* IMPORTANT: proper hide without layout bugs */
 .hidden{
   display:none !important;
-  pointer-events:none;
 }
 
 .result{
@@ -114,20 +105,17 @@ label{
 
 <h2>📊 Forex Risk Calculator</h2>
 
-<!-- BUY / SELL -->
 <div class="toggle">
   <button onclick="setDirection('buy')" id="buyBtn">BUY</button>
   <button onclick="setDirection('sell')" id="sellBtn">SELL</button>
 </div>
 
-<!-- MODE -->
 <div class="toggle">
   <button onclick="setMode('risk')" id="modeRisk">Risk→SL</button>
   <button onclick="setMode('sl')" id="modeSL">SL→Risk</button>
   <button onclick="setMode('lot')" id="modeLot">Risk→LOT</button>
 </div>
 
-<!-- ACCOUNT -->
 <div class="toggle">
   <button onclick="setAccount('standard')" id="stdBtn">Standard</button>
   <button onclick="setAccount('cent')" id="centBtn">Cent</button>
@@ -141,7 +129,7 @@ label{
   <option>XAUUSD</option>
 </select>
 
-<label id="entryLabel">Entry Price</label>
+<label>Entry Price</label>
 <input id="entry" type="number">
 
 <label id="slLabel">Stop Loss</label>
@@ -162,11 +150,45 @@ label{
 
 <script>
 
+const STORAGE_KEY = "fx_calculator_v1";
+
 let mode="lot";
 let direction="buy";
 let account="standard";
 
-/* SAFE CENT CONVERSION */
+/* SAVE */
+function saveState(){
+  const data = {
+    mode,
+    direction,
+    account,
+    pair: pair.value,
+    entry: entry.value,
+    sl: sl.value,
+    lot: lot.value,
+    risk: risk.value
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+/* LOAD */
+function loadState(){
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+
+  mode = saved.mode || "lot";
+  direction = saved.direction || "buy";
+  account = saved.account || "standard";
+
+  pair.value = saved.pair || "EURUSD";
+  entry.value = saved.entry || "";
+  sl.value = saved.sl || "";
+  lot.value = saved.lot || "";
+  risk.value = saved.risk || "";
+
+  updateUI();
+}
+
+/* CENT LOGIC */
 function accountMultiplier(){
   return account==="cent" ? 100 : 1;
 }
@@ -184,22 +206,21 @@ function riskPerLot(pair,diff){
   return pipValue() * pipMultiplier(pair) * diff;
 }
 
-/* UI STATE */
-function setMode(m){ mode=m; updateUI(); }
-function setDirection(d){ direction=d; updateUI(); }
-function setAccount(a){ account=a; updateUI(); }
+/* EVENTS */
+function setMode(m){ mode=m; updateUI(); saveState(); }
+function setDirection(d){ direction=d; updateUI(); saveState(); }
+function setAccount(a){ account=a; updateUI(); saveState(); }
 
-/* BUTTON STATES + FIELD VISIBILITY */
+/* UI */
 function updateUI(){
 
-  // reset active
   document.querySelectorAll(".toggle button").forEach(b=>b.classList.remove("active"));
 
   document.getElementById(mode==="risk"?"modeRisk":mode==="sl"?"modeSL":"modeLot").classList.add("active");
   document.getElementById(direction==="buy"?"buyBtn":"sellBtn").classList.add("active");
   document.getElementById(account==="cent"?"centBtn":"stdBtn").classList.add("active");
 
-  // ALWAYS reset visibility first
+  // reset visibility
   sl.classList.remove("hidden");
   lot.classList.remove("hidden");
   risk.classList.remove("hidden");
@@ -208,7 +229,6 @@ function updateUI(){
   lotLabel.classList.remove("hidden");
   riskLabel.classList.remove("hidden");
 
-  // MODE RULES
   if(mode==="risk"){
     lot.classList.add("hidden");
     lotLabel.classList.add("hidden");
@@ -224,12 +244,13 @@ function updateUI(){
     lotLabel.classList.add("hidden");
   }
 
-  // OUT ALWAYS CLEAR
   out.innerHTML="";
 }
 
 /* RESET */
 function resetAll(){
+  localStorage.removeItem(STORAGE_KEY);
+
   entry.value="";
   sl.value="";
   lot.value="";
@@ -237,7 +258,7 @@ function resetAll(){
   out.innerHTML="";
 }
 
-/* MAIN CALC */
+/* CALC */
 function calc(){
 
   let e=parseFloat(entry.value);
@@ -272,9 +293,12 @@ function calc(){
     let lotSize=(r*cent)/riskPerLot(pair.value,diff);
     out.innerHTML=`<div class="big">${lotSize.toFixed(3)}</div>`;
   }
+
+  saveState();
 }
 
-updateUI();
+/* INIT */
+loadState();
 
 </script>
 
