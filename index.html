@@ -1,58 +1,88 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Forex Risk Calculator</title>
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: Arial;
       background: linear-gradient(135deg,#0f172a,#020617);
       color:white;
-      padding:20px;
+      margin:0;
+      padding:10px;
+      display:flex;
+      justify-content:center;
     }
 
     .card {
       background:#1e293b;
-      padding:25px;
+      padding:20px;
       border-radius:20px;
+      width:90%;
       max-width:420px;
-      margin:auto;
+      min-height:90vh;
       box-shadow:0 10px 30px rgba(0,0,0,0.5);
+      display:flex;
+      flex-direction:column;
+      justify-content:flex-start;
     }
 
-    h2 { text-align:center; margin-bottom:15px; }
+    h2 {
+      text-align:center;
+      margin-bottom:15px;
+      font-size:20px;
+    }
 
     input, select {
       width:100%;
-      padding:12px;
+      padding:14px;
       margin:8px 0;
       border-radius:10px;
       border:none;
       background:#0f172a;
       color:white;
+      font-size:16px;
     }
 
-    button {
+    .btn {
       width:100%;
       padding:14px;
-      background:linear-gradient(90deg,#22c55e,#16a34a);
       border:none;
       border-radius:12px;
       font-weight:bold;
       margin-top:10px;
       cursor:pointer;
+      font-size:16px;
+    }
+
+    .calc-btn {
+      background:linear-gradient(90deg,#22c55e,#16a34a);
     }
 
     .reset-btn {
       background:linear-gradient(90deg,#ef4444,#dc2626);
     }
 
+    .btn-group {
+      display:flex;
+      gap:10px;
+    }
+
+    .btn-group .btn {
+      width:50%;
+    }
+
     .result {
       margin-top:20px;
       font-size:18px;
       text-align:center;
+      word-wrap:break-word;
     }
 
     .highlight {
@@ -68,17 +98,28 @@
 
     .toggle {
       display:flex;
-      justify-content:space-between;
+      gap:10px;
       margin-bottom:10px;
     }
 
     .toggle button {
-      width:48%;
+      flex:1;
+      padding:12px;
+      border:none;
+      border-radius:10px;
       background:#334155;
+      color:white;
+      font-size:14px;
+      cursor:pointer;
     }
 
     .active {
       background:#22c55e !important;
+    }
+
+    label {
+      font-size:14px;
+      opacity:0.8;
     }
 
     small {
@@ -86,6 +127,7 @@
       text-align:center;
       opacity:0.7;
       margin-bottom:10px;
+      font-size:12px;
     }
   </style>
 </head>
@@ -151,10 +193,11 @@
     <input type="number" id="riskInput" placeholder="e.g 0.50">
   </div>
 
-  <button onclick="calculate()">Calculate</button>
-
-  <!-- RESET BUTTON -->
-  <button class="reset-btn" onclick="resetApp()">Reset</button>
+  <!-- BUTTONS -->
+  <div class="btn-group">
+    <button class="btn calc-btn" onclick="calculate()">Calculate</button>
+    <button class="btn reset-btn" onclick="resetApp()">Reset</button>
+  </div>
 
   <div class="result" id="output"></div>
 </div>
@@ -164,40 +207,34 @@ let mode = 'sl';
 let direction = 'buy';
 let accountType = 'standard';
 
-/* ---------- STORAGE ---------- */
+/* STORAGE */
 function saveData(){
-  const data = {
+  localStorage.setItem("forexCalc", JSON.stringify({
     lot: lot.value,
     entry: entry.value,
     sl: sl.value,
     risk: riskInput.value,
     pair: pairType.value,
-    mode,
-    direction,
-    accountType
-  };
-  localStorage.setItem("forexCalc", JSON.stringify(data));
+    mode, direction, accountType
+  }));
 }
 
 function loadData(){
-  let data = JSON.parse(localStorage.getItem("forexCalc"));
-  if(!data){
-    setMode('sl');
-    return;
-  }
+  let d = JSON.parse(localStorage.getItem("forexCalc"));
+  if(!d){ setMode('sl'); return; }
 
-  lot.value = data.lot || "";
-  entry.value = data.entry || "";
-  sl.value = data.sl || "";
-  riskInput.value = data.risk || "";
-  pairType.value = data.pair || "EURUSD";
+  lot.value = d.lot || "";
+  entry.value = d.entry || "";
+  sl.value = d.sl || "";
+  riskInput.value = d.risk || "";
+  pairType.value = d.pair || "EURUSD";
 
-  setDirection(data.direction || 'buy');
-  setMode(data.mode || 'sl');
-  setAccount(data.accountType || 'standard');
+  setDirection(d.direction || 'buy');
+  setMode(d.mode || 'sl');
+  setAccount(d.accountType || 'standard');
 }
 
-/* ---------- RESET ---------- */
+/* RESET */
 function resetApp(){
   localStorage.removeItem("forexCalc");
 
@@ -219,7 +256,7 @@ document.querySelectorAll("input, select").forEach(el=>{
   el.addEventListener("input", saveData);
 });
 
-/* ---------- TOGGLES ---------- */
+/* TOGGLES */
 function setDirection(d){
   direction = d;
   buyBtn.classList.remove('active');
@@ -254,21 +291,21 @@ function setAccount(type){
 
   accountHint.innerText =
     type === 'cent'
-    ? "💡 Cent = very small risk (good for $10–$50)"
-    : "💡 Standard = larger risk (recommended $100+)";
+    ? "💡 Cent = very small risk ($10–$50)"
+    : "💡 Standard = larger risk ($100+)";
 
   saveData();
 }
 
-/* ---------- CALCULATIONS ---------- */
+/* CALC */
 function getPipMultiplier(pair){
   return pair.includes('JPY') ? 100 : 10000;
 }
 
 function getPipValue(pair, lot){
   let base = pair.includes('JPY') ? 9.1 : 10;
-  let value = base * lot;
-  return accountType === 'cent' ? value / 100 : value;
+  let val = base * lot;
+  return accountType === 'cent' ? val/100 : val;
 }
 
 function showError(msg){
@@ -281,54 +318,39 @@ function calculate(){
   let entryVal = parseFloat(entry.value);
 
   if(!lotVal || !entryVal){
-    return showError("Enter lot size and entry price");
+    return showError("Enter lot & entry price");
   }
 
   if(mode === 'sl'){
     let slVal = parseFloat(sl.value);
     if(!slVal) return showError("Enter stop loss");
 
-    if(direction === 'buy' && slVal >= entryVal){
-      return showError("BUY: SL must be BELOW entry");
-    }
-    if(direction === 'sell' && slVal <= entryVal){
-      return showError("SELL: SL must be ABOVE entry");
-    }
+    if(direction==='buy' && slVal>=entryVal) return showError("BUY: SL below entry");
+    if(direction==='sell' && slVal<=entryVal) return showError("SELL: SL above entry");
 
     let diff = Math.abs(entryVal - slVal);
-    let risk;
+    let risk = pair==="XAUUSD"
+      ? diff * (accountType==='cent'?1:100) * lotVal
+      : getPipValue(pair, lotVal) * diff * getPipMultiplier(pair);
 
-    if(pair === 'XAUUSD'){
-      let mult = accountType === 'cent' ? 1 : 100;
-      risk = diff * mult * lotVal;
-    } else {
-      let pips = diff * getPipMultiplier(pair);
-      risk = getPipValue(pair, lotVal) * pips;
-    }
-
-    output.innerHTML =
-      `Estimated Loss:<br><span class="highlight">$${risk.toFixed(2)}</span>`;
+    output.innerHTML = `Loss:<br><span class="highlight">$${risk.toFixed(2)}</span>`;
   }
-
-  else {
+  else{
     let riskVal = parseFloat(riskInput.value);
-    if(!riskVal) return showError("Enter desired risk");
+    if(!riskVal) return showError("Enter risk");
 
     let slPrice;
 
-    if(pair === 'XAUUSD'){
-      let mult = accountType === 'cent' ? 1 : 100;
-      let move = riskVal / (mult * lotVal);
-      slPrice = direction === 'buy' ? entryVal - move : entryVal + move;
+    if(pair==="XAUUSD"){
+      let move = riskVal / ((accountType==='cent'?1:100)*lotVal);
+      slPrice = direction==='buy'? entryVal-move : entryVal+move;
     } else {
-      let pipVal = getPipValue(pair, lotVal);
-      let pips = riskVal / pipVal;
+      let pips = riskVal / getPipValue(pair, lotVal);
       let move = pips / getPipMultiplier(pair);
-      slPrice = direction === 'buy' ? entryVal - move : entryVal + move;
+      slPrice = direction==='buy'? entryVal-move : entryVal+move;
     }
 
-    output.innerHTML =
-      `Set Stop Loss at:<br><span class="highlight">${slPrice.toFixed(5)}</span>`;
+    output.innerHTML = `SL:<br><span class="highlight">${slPrice.toFixed(5)}</span>`;
   }
 
   saveData();
